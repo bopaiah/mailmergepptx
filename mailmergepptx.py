@@ -20,6 +20,44 @@ def replace_text_in_shape(shape, replacements):
                 if old_text in run.text:
                     run.text = run.text.replace(old_text, new_text)
 
+def merge_ppt(excel_filename, ppt_filename):
+    # Load the Excel file
+    workbook = openpyxl.load_workbook(excel_filename)
+    sheet = workbook.active
+
+    # Get column headers from the first row
+    headers = [cell.value for cell in sheet[1]]
+
+    # Load the PowerPoint template
+    prs = Presentation(ppt_filename)
+
+    output_filename = f"merged_{ppt_filename}"
+    print(f"Generating {output_filename}...")
+
+    # Iterate over each row in the Excel sheet starting from the second row
+    for row_number, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+        replacements = {f"{headers[i]}": row[i] for i in range(len(headers))}
+
+        # Get the slide number corresponding to the row number
+        slide_num = row_number - 2  # Assuming the first row (min_row=2) corresponds to the first slide (index 0)
+        
+        # Check if the slide number is within the range of slides in the presentation
+        if slide_num >= len(prs.slides):
+            continue  # Skip if slide number is out of range
+        
+        slide = prs.slides[slide_num]
+
+        # Replace text in the slide
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                replace_text_in_shape(shape, replacements)
+
+        # Save the modified presentation
+
+        prs.save(output_filename)
+        print(f"Updated row {row_number:03} to slide {row_number - 1:03}")
+    print(f"Generated {output_filename}")
+
 def generate_split_ppt(excel_filename, ppt_filename):
     # Load the Excel file
     workbook = openpyxl.load_workbook(excel_filename)
@@ -118,19 +156,25 @@ if __name__ == "__main__":
         convert_all_pptx_to_pdf()
     elif "/m" in sys.argv:
         merge_pdfs()
+    elif "/s" in sys.argv and argslen == 4:
+        excel_filename = sys.argv[2]
+        ppt_filename = sys.argv[3]
+        generate_split_ppt(excel_filename, ppt_filename)
     elif argslen == 3:
         excel_filename = sys.argv[1]
         ppt_filename = sys.argv[2]
-        generate_split_ppt(excel_filename, ppt_filename)
+        merge_ppt(excel_filename, ppt_filename)
     else:
         print("Usage: python mailmergepptx <excel_filename> <ppt_filename>")
-        print("       Use the same name as the column headers in Excel for replacing the text in the slide.")
-        print("       The output will be list of Row_rownumber.pptx and pdf along with a combined merged.pdf containing all slides.")
+        print("       Use the same name as the column headers in Excel for replacing the text in the slide.\n")
+        print("       Create a pptx file with as many slides as the number of rows in excel. One slide for each row.")
+        print("       The output will be merged_filename.pptx with data from excel row replaced into the corresponding slide number.")
         print("       Program works only on Windows with MS PowerPoint installation is required for the exporting pptx to pdf.")
         print("       Example: If the column header is 'title', the application will replace all the text 'title'")
         print("                throughout the slide with the content in the excel rows.\n")
         print("       /p <pptx filename> for only converting pptx to pdf. The PDF file is generated in same folder as PPTX.")
         print("       /a  with no other arguments for converting all the generated *_slide.pptx to pdf.")
         print("       /m  with no other arguments for merging all pdf files in the current folder to merged.pdf.")
+        print("       /s  Generates Single ppt for each row from excel and converts to PDF.")
 
 # End of program
